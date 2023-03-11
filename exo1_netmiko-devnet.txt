@@ -1,0 +1,95 @@
+-appliquez les configurations de base sur chaque appareil
+-S1
+---------------
+conf t
+host S1
+enable password cisco
+username devnet privilege 15 password 0 cisco
+interface Vlan 1
+ip address 192.168.122.34 255.255.255.0
+no sh
+ip default-gateway 192.168.122.36
+line con 0
+password cisco
+line aux 0
+line vty 0 4
+exec-timeout 720 0
+login local
+password cisco
+transport input all
+end
+Router R1 :
+---------------
+conf t
+hostname R1
+int f0/0
+ip address 192.168.122.36 255.255.255.0
+no shutdown
+enable password cisco
+username devnet password cisco
+line vty 0 4
+login local
+transport input all
+end
+-configurez ssh (nom de domaine : isidevnet.com)
+Sur S1
+ip domain-name isidevnet.com
+username admin privilege 15 secret cisco
+crypto key generate rsa 
+                    :1024
+line vty 0 15
+login local 
+transport input ssh
+Sur R2
+ip domain-name isidevnet.com
+username admin privilege 15 secret cisco
+crypto key generate rsa 
+                    :1024
+line vty 0 15
+login local 
+transport input ssh
+
+-Créez un script netmiko simple qui se connectera à la fois au routeur et au commutateur.
+
+from netmiko import ConnectHandler
+import getpass
+
+username = input("Please enter your username: ")
+password = getpass.getpass("Please enter your username password: ")
+secret = getpass.getpass("Please enter your secret password: ")
+
+s1 = {
+    'device_type': 'cisco_ios',
+    'ip': '192.168.122.34',
+    'username': username,
+    'password': password
+}
+
+r1 = {
+    'device_type': 'cisco_ios',
+    'ip': '192.168.122.36',
+    'username': username,
+    'password': password,
+    'secret': password,
+
+}
+
+if s1['ip'] == '192.168.122.34':
+    net_connect = ConnectHandler(**s1)
+    output = net_connect.send_command('show ip int brief')
+    print (output)
+    net_connect.send_command('spanning-tree mode pvst')
+    for n in range (2,12):
+       print("Creating VLAN " + str(n))
+       config_commands = ['vlan ' + str(n), 'name Python_VLAN ' + str(n)]
+       output = net_connect.send_config_set(config_commands)
+
+if r1['ip'] == '192.168.122.36':
+ net_connect = ConnectHandler(**r1)
+ net_connect.enable()
+ config_commands = ['int loop 0',
+                      ' ip address 1.1.1.1 255.255.255.0',
+                               'no sh']
+ output = net_connect.send_config_set(config_commands)
+ print (output)
+

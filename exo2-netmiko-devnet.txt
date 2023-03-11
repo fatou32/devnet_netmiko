@@ -1,0 +1,180 @@
+Les configurations de base
+-S1
+---------------
+conf t
+host S1
+enable password cisco
+username devnet privilege 15 password 0 cisco
+interface Vlan 1
+ip address 192.168.122.31 255.255.255.0
+no sh
+ip default-gateway 192.168.122.36
+line con 0
+password cisco
+line aux 0
+line vty 0 4
+exec-timeout 720 0
+login local
+password cisco
+transport input all
+end
+
+-S2
+---------------
+conf t
+host S2
+enable password cisco
+username devnet privilege 15 password 0 cisco
+interface Vlan 1
+ip address 192.168.122.32 255.255.255.0
+no sh
+ip default-gateway 192.168.122.36
+line con 0
+password cisco
+line aux 0
+line vty 0 4
+exec-timeout 720 0
+login local
+password cisco
+transport input all
+end
+
+-S3
+---------------
+conf t
+host S3
+enable password cisco
+username devnet privilege 15 password 0 cisco
+interface Vlan 1
+ip address 192.168.122.33 255.255.255.0
+no sh
+ip default-gateway 192.168.122.36
+line con 0
+password cisco
+line aux 0
+line vty 0 4
+exec-timeout 720 0
+login local
+password cisco
+transport input all
+end
+
+Router R1 :
+---------------
+conf t
+hostname R1
+int f0/0
+ip address 192.168.122.36 255.255.255.0
+no shutdown
+enable password cisco
+username devnet password cisco
+line vty 0 4
+login local
+transport input all
+end
+-configurez ssh (nom de domaine : isidevnet.com)
+
+-Sur S1
+---------------
+ip domain-name isidevnet.com
+username admin privilege 15 secret cisco
+crypto key generate rsa 
+                    :1024
+line vty 0 15
+login local 
+transport input ssh
+
+-Sur S2
+---------------
+ip domain-name isidevnet.com
+username admin privilege 15 secret cisco
+crypto key generate rsa 
+                    :1024
+line vty 0 15
+login local 
+transport input ssh
+
+-Sur S3
+---------------
+ip domain-name isidevnet.com
+username admin privilege 15 secret cisco
+crypto key generate rsa 
+                    :1024
+line vty 0 15
+login local 
+transport input ssh
+
+-Sur R2
+---------------
+ip domain-name isidevnet.com
+username admin privilege 15 secret cisco
+crypto key generate rsa 
+                    :1024
+line vty 0 15
+login local 
+transport input ssh
+
+-Créez un nouveau script netmiko simple qui se connectera sur les 4 equipement (1 routeur, 3 switches)
+--------------------------------------------------------------------------------------------------
+1- Le script va ouvrir un fichier text nommé l2_conf.txt contant les configurations
+2- Le script lit les configurations de ce fichier et les appliques sur les switches.
+3-Le script vérifiera si l'adresse IP du périphérique est l'adresse IP du routeur 
+   et il activera le routage ospf au niveau du routeur network 0.0.0.0/32
+
+from netmiko import ConnectHandler
+import getpass
+
+username = input("Please enter your username: ")
+password = getpass.getpass("Please enter your username password: ")
+secret = getpass.getpass("Please enter your secret password: ")
+
+s1 = {
+    'device_type': 'cisco_ios',
+    'ip': '192.168.122.31',
+    'username': username,
+    'password': password
+}
+
+s2 = {
+    'device_type': 'cisco_ios',
+    'ip': '192.168.122.32',
+    'username': username,
+    'password': password
+}
+
+s3 = {
+    'device_type': 'cisco_ios',
+    'ip': '192.168.122.33',
+    'username': username,
+    'password': password
+}
+
+r1 = {
+    'device_type': 'cisco_ios',
+    'ip': '192.168.122.36',
+    'username': username,
+    'password': password,
+    'secret': password,
+
+}
+with open('l2_conf.txt') as f:
+ lines = f.read().splitlines()
+ print(lines)
+
+all_devices = [s1,s2,s3]
+for device in all_devices:
+  net_connect = ConnectHandler(**device)
+  output = net_connect.send_config_set(lines)
+  print(output)
+if r1['ip'] == '192.168.122.36':
+   net_connect = ConnectHandler(**r1)
+   net_connect.enable()
+   config_commands = ['router ospf 1',
+                      'network 0.0.0.0 0.0.0.0 area 0']
+   output = net_connect.send_config_set(config_commands )
+   print (output)
+
+net_connect.disconnect()
+
+ 
+
